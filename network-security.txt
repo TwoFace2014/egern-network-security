@@ -104,7 +104,18 @@ function maskIp(ip) {
 }
 
 function filterCheck(ctx) {
-  const stats = ctx.storage?.getJSON(RULE_STATS_KEY);
+  const stats = (() => {
+    try {
+      if (typeof ctx.storage?.getJSON === 'function') return ctx.storage.getJSON(RULE_STATS_KEY);
+      if (typeof ctx.storage?.get === 'function') {
+        const raw = ctx.storage.get(RULE_STATS_KEY);
+        return typeof raw === 'string' ? JSON.parse(raw) : raw;
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  })();
   if (!stats || !Number(stats.totalRequests)) {
     return check('filter', '规则过滤', '未连接', 'unknown', '未读取到规则防护统计');
   }
@@ -470,7 +481,7 @@ function lockWidget(data, family) {
 
 export default async function(ctx) {
   const data = await loadSecurity(ctx);
-  const family = ctx.widgetFamily || 'systemMedium';
+  const family = typeof ctx.widgetFamily === 'string' ? ctx.widgetFamily : 'systemMedium';
   if (family.startsWith('accessory')) return lockWidget(data, family);
   if (family === 'systemSmall') return smallWidget(data, ctx);
   if (family === 'systemLarge' || family === 'systemExtraLarge') return largeWidget(data, ctx);
